@@ -1,0 +1,116 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MaxAbsScaler
+from minepy import MINE
+from statsmodels.graphics.tsaplots import plot_pacf
+if __name__=='__main__':
+    data=pd.read_csv(r'D:\Users\Administrator\PycharmProjects\untitled\residual2020.csv',index_col='time')
+    residual=data['residual'].values.reshape(-1,1)
+    data=pd.read_csv(r'C:\Users\Administrator\Desktop\data\dis.csv',index_col="time0")
+    level=data['water_level'].values.reshape(-1,1)
+    precipitation=data['precipitation'].values.reshape(-1,1)
+    scaler_residual=MaxAbsScaler().fit(residual)
+    scaler_level=MaxAbsScaler().fit(level)
+    scaler_precipitation=MaxAbsScaler().fit(precipitation)
+    residual=scaler_residual.transform(residual)
+    level=scaler_level.transform(level)
+    precipitation=scaler_precipitation.transform(precipitation)
+    residual_0=residual[4:].reshape(1,-1);residual_1=residual[3:-1];residual_2=residual[2:-2]
+    level_0=level[4:];level_1=level[3:-1];level_2=level[2:-2];level_3=level[1:-3];level_4=level[:-4];level_change=np.diff(level[3:],axis=0);level_change_1=np.diff(level[2:-1],axis=0);level_change_2=np.diff(level[1:-2],axis=0)
+    pre_0=precipitation[4:];pre_1=precipitation[3:-1];pre_2=precipitation[2:-2];pre_3=precipitation[1:-3];pre_sum=pre_0+pre_1
+    LEVEL = [level_0, level_1, level_2, level_3, level_change, level_change_1,level_change_2]
+    PRE = [pre_0, pre_1, pre_2, pre_3,pre_sum]
+    plot_pacf(residual_0.reshape(-1,1),lags=6)
+    plt.title('PACF of periodic displacement')
+    plt.show()
+    
+    for i in PRE:
+        mine=MINE(alpha=0.6)
+        mine.compute_score(residual_0.flatten(),i.flatten())
+        print (mine.mic())
+    Label = residual_0.reshape(-1, 1)
+    input_data = np.hstack(
+        (residual_1, residual_2, level_2, level_3, level_change, level_change_1, pre_1, pre_2, pre_3))
+''''''
+    N_split=0.8
+    PREDICT_NUM = 12
+    train_size=int((len(Label)-PREDICT_NUM)*N_split)
+    valid_size=len(Label)-train_size-PREDICT_NUM
+    text_size=len(Label)-train_size-valid_size
+
+    from keras.models import Sequential
+    from keras.layers import LSTM,Dense,Conv1D,BatchNormalization,MaxPool1D,Dropout,Flatten,AvgPool1D,Activation
+    from keras.layers import TimeDistributed
+    from keras.callbacks import ReduceLROnPlateau
+    from keras.callbacks import EarlyStopping
+    from keras import regularizers,initializers,optimizers
+
+    CE=[];LO=[]
+    for ce in range(1):
+        sequence_length=22
+        dim_in=9;dim_out=1
+        train=np.zeros((train_size - sequence_length, sequence_length, dim_in))
+        train_label=np.zeros((train_size - sequence_length, dim_out))
+        valid=np.zeros((valid_size, sequence_length, dim_in))
+        valid_label=np.zeros((valid_size, dim_out))
+        text=np.zeros((text_size, sequence_length, dim_in))
+
+        text_label=np.zeros((text_size, dim_out))
+        for i in range(sequence_length, train_size):
+            train[i - sequence_length] = input_data[i - sequence_length:i]
+            train_label[i - sequence_length] = Label[i]
+        for i in range(train_size, valid_size + train_size):
+            valid[i - train_size] = input_data[i - sequence_length:i]
+            valid_label[i - train_size] = Label[i]
+        for i in range(valid_size + train_size, len(Label)):
+            text[i - train_size - valid_size] = input_data[i - sequence_length:i]
+            text_label[i - train_size - valid_size] = Label[i]
+
+        model=Sequential()
+        initializers.Zeros()
+        model.add(Conv1D(filters=72,kernel_size=2,padding='same',input_shape=(sequence_length,dim_in)))
+        model.add(BatchNormalization())
+        model.add(Activation('relu'))
+        model.add(AvgPool1D(pool_size=2,padding='valid'))
+        model.add(Dropout(0.1))
+        #
+        model.add(Conv1D(filters=72,kernel_size=2,padding='same'))
+        model.add(BatchNormalization())
+        model.add(Activation('relu'))
+        model.add(AvgPool1D(pool_size=2, padding='valid'))
+        model.add(Dropout(0.1))
+
+        model.add(Conv1D(filters=128,kernel_size=2,padding='same',input_shape=(sequence_length,dim_in)))
+        model.add(BatchNormalization())
+        model.add(Activation('relu'))
+        model.add(AvgPool1D(pool_size=2,padding='valid'))
+        model.add(Dropout(0.1))
+        model.add(Flatten())
+        model.add(Dense(256,activation='relu'))
+        model.add(Dense(128,activation='relu'))
+        model.add(Dense(1,activation='tanh'))
+        model.compile(loss='mean_squared_error',optimizer='adam')
+        # history=model.fit(train,train_label,batch_size=64,epochs=500,validation_data=(valid,valid_label))
+        # LOSS.append(model.evaluate(valid,valid_label))
+#     CE.append(ce);LO.append(sum(LOSS)/10)
+# print (CE[LO.index(min(LO))])
+        TRAN = np.append(train, valid, axis=0);TRAN_LABEL = np.append(train_label, valid_label, axis=0)
+
+        history = model.fit(TRAN, TRAN_LABEL,batch_size=240,epochs=500,validation_data=(text,text_label))
+        plt.plot(history.history['val_loss'],label='val_loss')
+        plt.plot(history.history['loss'],label='loss')
+        plt.legend(loc='best')
+        plt.show()
+        a = model.predict(text)
+        LO.append(scaler_residual.inverse_transform(a.reshape(-1,1)))
+        RESULT=np.zeros(LO[0].shape)
+        for i in range(len(LO)):
+            RESULT+=LO[i]
+        RESULT=RESULT/len(LO)
+        print(RESULT)
+        plt.plot(RESULT,'r*-',label='predicted values')
+        plt.plot(scaler_residual.inverse_transform(text_label),'ko-',label='ground truth')
+        plt.legend(loc='best')
+        plt.title('R2=:%.4f'%np.sqrt(np.sum((RESULT-scaler_residual.inverse_transform(text_label))**2)/len(RESULT)))
+        plt.show()
