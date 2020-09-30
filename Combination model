@@ -1,0 +1,212 @@
+#coding=utf-8
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from pyswarm import pso
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score
+import random
+if __name__=='__main__':
+    file_path=r'C:\Users\Administrator\Desktop\data\dis_zg111.csv'
+    data=pd.read_csv(file_path,index_col="time0")
+    data_dis=data['displacement'].values 
+    level = data['water_level'].values.reshape(-1, 1)
+    precipitation = data['precipitation'].values.reshape(-1, 1)
+    data_dis_train=data_dis[:].reshape(-1,1)
+''''''
+    windowlen=int(len(data_dis_train)/3) 
+    serieslen=len(data_dis_train)
+    n=serieslen-windowlen+1
+    #嵌入    X=np.zeros((windowlen,n))
+    for i in range(n):
+        X[:,i]=data_dis_train[i:i+windowlen].reshape(1,-1)
+    U,sigema,VT=np.linalg.svd(X,full_matrices=False)
+    percent=[]
+    for i in sigema:
+        percent.append(i/np.sum(sigema)*100)
+    a=pd.DataFrame(percent).cumsum()
+    plt.plot(a,'k+-',label='cumulative contribution rate')
+    plt.legend(loc='best')
+    plt.show()
+'''''
+    EE=[]
+    for i in range(windowlen):
+        EE.append(sigema[i]*np.matmul(U[:,i].reshape(-1,1),VT[i,:].reshape(1,-1)))
+    rec=np.zeros((windowlen,serieslen))
+    for c in range(len(EE)):
+        for k in range(windowlen-1):
+            for m in range(k+1):
+                rec[c,k]+=EE[c][m][k-m]
+            rec[c,k]/=(k+1)
+        for k in range(windowlen-1,serieslen-windowlen+1):
+            for m in range(windowlen):
+                rec[c,k]+=EE[c][m][k-m]
+            rec[c,k]/=windowlen
+        for k in range(serieslen-windowlen+1,serieslen):
+            for m in range(k-serieslen+windowlen,windowlen):
+                rec[c, k] += EE[c][m][k-m]
+            rec[c,k]/=(serieslen-k)
+    N0=2 ;N1=13 
+    trend=np.sum(rec[:N0,:],axis=0)
+    nonlinear=np.sum(rec[N0:N1,:],axis=0)
+    data_dis_train=np.sum(rec[:N1,:],axis=0)
+    # pd.DataFrame(trend).to_csv('trendzg11.csv')
+    # pd.DataFrame(nonlinear).to_csv('residualzg11.csv')
+    # plt.plot(data_dis_train,label='original_denosie')
+'''''''
+    plt.subplot(211)
+    plt.plot(trend,label='trend')
+    plt.legend(loc='best')
+    plt.subplot(212)
+    plt.plot(nonlinear,label='residual')
+    plt.legend(loc='best')
+    plt.show()
+''''''
+    residual=nonlinear.reshape(-1,1)
+    trend=trend.reshape(-1,1)
+    scaler_trend = MinMaxScaler().fit(trend)
+    trend_stand = scaler_trend.transform(trend)
+    trend_change = np.diff(trend, axis=0).reshape(-1, 1)
+    scaler_change = MinMaxScaler().fit(trend_change)
+    trend_change_stand = scaler_change.transform(trend_change)
+    trend_change2 = np.diff(trend_change, axis=0).reshape(-1, 1)
+    scaler_change2 = MinMaxScaler().fit(trend_change2)
+    trend_change2_stand = scaler_change2.transform(trend_change2)
+    trend_cluster = np.hstack((trend_stand[1:], trend_change_stand))
+
+    s = [];nn = []
+    for n in range(2, 10):
+        Cluster = KMeans(n_clusters=n)
+        L = Cluster.fit_predict(trend_cluster)
+        s.append(silhouette_score(trend_cluster, L))
+        nn.append(n)
+    # pd.DataFrame(s).to_csv('silhout_zg118.csv')
+    k_best=nn[s.index(max(s))]
+
+    CLUSTER_RESULT= {}
+    Cluster = KMeans(n_clusters=k_best)
+    Label=Cluster.fit_predict(trend_cluster)
+'''''
+    LABEL=Label[0]
+    for i in range(k_best):
+        CLUSTER_RESULT[str(i)]=list()
+    number=0
+'''''
+    for index in range(trend.shape[0] - 1):
+        if LABEL==Label[index]:
+            CLUSTER_RESULT[str(number)].append([trend[index + 1][0], [index + 1]])
+        else:
+            LABEL=Label[index]
+            number+=1
+            CLUSTER_RESULT[str(number)].append([trend[index + 1][0], [index + 1]])
+    def random_color():
+        colorArr=['1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
+        color=''
+        for i in range(6):
+            color+=colorArr[random.randint(0,14)]
+        return '#'+color
+    for i in range(k_best):
+        index=[INDEX[1] for INDEX in CLUSTER_RESULT[str(i)]] 
+        values=[INDEX[0] for INDEX in CLUSTER_RESULT[str(i)]] 
+        plt.plot(index,values,'+-',color=random_color(),label='cluster'+str(i))
+    plt.legend(loc='best')
+    plt.show()
+    
+    def R2(y, y_hat):
+        y = np.array(y)
+        y_hat = np.array(y_hat)
+        y_mean = np.mean(y)
+        Stol = np.sum((y - y_mean) ** 2)
+        Sre = np.sum((y - y_hat) ** 2)
+        return 1 - Sre / Stol
+
+    PREDICT_NUM
+    PREDICT_NUM=12
+    INDEX = [CLUSTER_RESULT[str(k_best-1)][i][1][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM)]
+    INDEX_1 = [CLUSTER_RESULT[str(k_best-1)][i][1][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM,
+                                                                     len(CLUSTER_RESULT[str(k_best-1)]))]
+    II = [CLUSTER_RESULT[str(k_best-1)][i][1][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]))]
+    TREND_FOR = [CLUSTER_RESULT[str(k_best-1)][i][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM)]
+    TREND_BACK = [CLUSTER_RESULT[str(k_best-1)][i][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM, len(CLUSTER_RESULT[str(k_best-1)]))]
+''''''
+    polynomial_degree=3
+    cc = np.polyfit(INDEX, TREND_FOR,polynomial_degree)
+    P = np.poly1d(cc)
+    plt.subplot(211)
+    plt.plot(P(INDEX),'ro-',label='fitted value')
+    plt.plot(TREND_FOR,'k+-',label='ground truth')
+    plt.title('R2=%.4f'%R2(TREND_FOR, P(INDEX)))
+    plt.legend(loc='best')
+    plt.subplot(212)
+    plt.plot(P(INDEX_1),'ro-',label='predicted value')
+    plt.plot(TREND_BACK,'k+-',label='ground truth')
+    plt.title('R2=%.4f'%R2(TREND_BACK, P(INDEX_1)))
+    plt.legend(loc='best')
+    plt.show()
+ ''''''
+    def GM(alpha):
+        alpha = alpha[0]
+        X_0 = TREND_FOR
+        X_1 = [sum(X_0[:i + 1]) for i in range(len(X_0))]
+        Z = np.zeros(len(X_1))
+        for i in range(1, len(X_1)):
+            Z[i] = 0.5 * (X_1[i - 1] + X_1[i])
+        B = np.zeros((len(Z) - 1, 2))
+        for i in range(B.shape[0]):
+            B[i][0] = -Z[i + 1]
+            B[i][1] = (Z[i + 1]) ** alpha
+        B = np.mat(B)
+        Y = np.mat(np.array([X_0[i + 1] for i in range(len(X_0) - 1)]).reshape(-1, 1))
+        parameter = np.array(np.linalg.inv(B.T * B) * B.T * Y)
+        a = parameter[0][0];b = parameter[1][0]
+        X_1_bar = np.zeros(len(X_1))
+        X_1_bar[0] = X_0[0]
+        for k in range(1, len(X_1_bar)):
+            X_1_bar[k] = ((X_1[0] ** (1 - alpha) - b / a) * np.exp(-(1 - alpha) * a * (k)) + b / a) ** (1 / (1 - alpha))
+        X_0_bar = np.zeros(len(X_0))
+        for k in range(1, len(X_0)):
+            X_0_bar[k] = X_1_bar[k] - X_1_bar[k - 1]
+        return np.sqrt(sum([X**2 for X in X_0_bar[2:] - X_0[2:]]) / len(X_0_bar[2:]))
+
+    def PLOT(alpha):
+        alpha = alpha[0];X_0 = TREND_FOR
+        X_1 = [sum(X_0[:i + 1]) for i in range(len(X_0))]
+        Z = np.zeros(len(X_1))
+        for i in range(1, len(X_1)):
+            Z[i] = 0.5 * (X_1[i - 1] + X_1[i])
+        B = np.zeros((len(Z) - 1, 2))
+        for i in range(B.shape[0]):
+            B[i][0] = -Z[i + 1]
+            B[i][1] = (Z[i + 1]) ** alpha
+        B = np.mat(B)
+        Y = np.mat(np.array([X_0[i + 1] for i in range(len(X_0) - 1)]).reshape(-1, 1))
+        parameter = np.array(np.linalg.inv(B.T * B) * B.T * Y)
+        a = parameter[0][0];b = parameter[1][0]
+        L = PREDICT_NUM
+        X_1_bar = np.zeros(len(X_1) + L)
+        X_1_bar[0] = X_0[0]
+        for k in range(1, len(X_1_bar)):
+            X_1_bar[k] = ((X_1[0] ** (1 - alpha) - b / a) * np.exp(-(1 - alpha) * a * (k)) + b / a) ** (1 / (1 - alpha))
+        X_0_bar = np.zeros(len(X_0) + L)
+        for k in range(1, len(X_0) + L):
+            X_0_bar[k] = X_1_bar[k] - X_1_bar[k - 1]
+        plt.subplot(311)
+        plt.plot(X_0_bar[2:-L], 'ro-', label='fitted value')
+        plt.plot(TREND_FOR[2:], 'ko-', label='ground truth')
+        plt.legend(loc='best')
+        plt.title('R2=%.4f'%R2(TREND_FOR[2:], X_0_bar[2:-L]))
+        plt.subplot(312)
+        plt.plot(X_0_bar[-L:], 'ro-', label='predicted value')
+        plt.plot(TREND_BACK, 'ko-', label='ground truth')
+        plt.legend(loc='best')
+        plt.title('R2=%.4f'%R2(TREND_BACK, X_0_bar[-L:]))
+        plt.subplot(313)
+        plt.plot(TREND_FOR[2:] + TREND_BACK, 'ro-', label='pre')
+        plt.plot(X_0_bar[2:], 'ko-', label='original')
+        plt.title('R2=%.4f'%R2(TREND_FOR[2:] + TREND_BACK, X_0_bar[2:]))
+        plt.legend(loc='best')
+        plt.show()
+    Lb=[-0.01];uB=[0.05]
+    xpot,xppt=pso(GM,lb=Lb,ub=uB,swarmsize=1000,phig=2,phip=1.5)
+PLOT(xpot)
