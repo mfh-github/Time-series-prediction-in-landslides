@@ -1,0 +1,75 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from statsmodels.graphics.tsaplots import plot_pacf
+import statsmodels as sm
+import grey_correlation
+from sklearn.preprocessing import MinMaxScaler
+from pyswarm import pso
+
+if __name__=='__main__':
+    data=pd.read_csv(r'C:\dis.csv',index_col="time0")
+    data_dis=data['displacement'].values
+    data_pre=data['precipitation'].values
+    data_level=data['water_level'].values
+    data_dis_train=data_dis[:].reshape(-1,1)
+    # scaler=MinMaxScaler().fit(data_dis_train)
+    # data_dis_train=scaler.transform(data_dis_train)
+
+    windowlen=int(len(data_dis_train)/3)
+    serieslen=len(data_dis_train) 
+    n=serieslen-windowlen+1
+
+    X=np.zeros((windowlen,n))
+    for i in range(n):
+        X[:,i]=data_dis_train[i:i+windowlen].reshape(1,-1)
+    U,sigema,VT=np.linalg.svd(X,full_matrices=False)
+
+    E=np.zeros(sigema.shape)
+    for i in range(len(sigema)):
+        E[i]=-(sigema[i]/sum(sigema))*np.log(sigema[i]/sum(sigema))
+    plt.plot(E)
+    plt.ylabel('Singular entropy')
+    plt.xlabel('Order of principal compoment')
+    # plt.legend(loc='best')
+    plt.show()
+    percent=[]
+    for i in sigema:
+        percent.append(i/np.sum(sigema)*100)
+    print (pd.DataFrame(percent).cumsum())
+    # plt.plot(pd.DataFrame(percent).cumsum())
+    # plt.show()
+
+    EE=[]
+    for i in range(windowlen):
+        EE.append(sigema[i]*np.matmul(U[:,i].reshape(-1,1),VT[i,:].reshape(1,-1)))
+''''
+    rec=np.zeros((windowlen,serieslen))
+    for c in range(len(EE)):
+        for k in range(windowlen-1):
+            for m in range(k+1):
+                rec[c,k]+=EE[c][m][k-m]
+            rec[c,k]/=(k+1)
+        for k in range(windowlen-1,serieslen-windowlen+1):
+            for m in range(windowlen):
+                rec[c,k]+=EE[c][m][k-m]
+            rec[c,k]/=windowlen
+        for k in range(serieslen-windowlen+1,serieslen):
+            for m in range(k-serieslen+windowlen,windowlen):
+                rec[c, k] += EE[c][m][k-m]
+            rec[c,k]/=(serieslen-k)
+    trend=np.sum(rec[:3,:],axis=0)
+    residual=np.sum(rec[3:-10,:],axis=0)
+    data_dis_train=np.sum(rec[:-10,:],axis=0)
+    # pd.DataFrame(trend).to_csv('trend2020.csv')
+    # pd.DataFrame(residual).to_csv('residual2020.csv')
+    # plt.plot(data_dis_train,label='original_denosie')
+    plt.plot(trend,label='trend')
+    plt.xlabel('time')
+    plt.ylabel('displacement/mm')
+    plt.legend(loc='best')
+    plt.show()
+    plt.plot(residual,label='residual')
+    plt.xlabel('time')
+    plt.ylabel('displacement/mm')
+    plt.show()
