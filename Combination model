@@ -18,7 +18,8 @@ if __name__=='__main__':
     windowlen=int(len(data_dis_train)/3) 
     serieslen=len(data_dis_train)
     n=serieslen-windowlen+1
-    #嵌入    X=np.zeros((windowlen,n))
+    #embeding
+    X=np.zeros((windowlen,n))
     for i in range(n):
         X[:,i]=data_dis_train[i:i+windowlen].reshape(1,-1)
     U,sigema,VT=np.linalg.svd(X,full_matrices=False)
@@ -65,6 +66,7 @@ if __name__=='__main__':
 ''''''
     residual=nonlinear.reshape(-1,1)
     trend=trend.reshape(-1,1)
+'''normalization'''
     scaler_trend = MinMaxScaler().fit(trend)
     trend_stand = scaler_trend.transform(trend)
     trend_change = np.diff(trend, axis=0).reshape(-1, 1)
@@ -101,6 +103,7 @@ if __name__=='__main__':
             number+=1
             CLUSTER_RESULT[str(number)].append([trend[index + 1][0], [index + 1]])
     def random_color():
+    #to obtain different color for plotting
         colorArr=['1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
         color=''
         for i in range(6):
@@ -122,7 +125,7 @@ if __name__=='__main__':
         return 1 - Sre / Stol
 
     PREDICT_NUM
-    PREDICT_NUM=12
+    PREDICT_NUM=12 # one year prediction
     INDEX = [CLUSTER_RESULT[str(k_best-1)][i][1][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM)]
     INDEX_1 = [CLUSTER_RESULT[str(k_best-1)][i][1][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM,
                                                                      len(CLUSTER_RESULT[str(k_best-1)]))]
@@ -130,7 +133,7 @@ if __name__=='__main__':
     TREND_FOR = [CLUSTER_RESULT[str(k_best-1)][i][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM)]
     TREND_BACK = [CLUSTER_RESULT[str(k_best-1)][i][0] for i in range(len(CLUSTER_RESULT[str(k_best-1)]) - PREDICT_NUM, len(CLUSTER_RESULT[str(k_best-1)]))]
 ''''''
-    polynomial_degree=3
+    polynomial_degree=3 #polynomial_degree changes from 2 to 4 
     cc = np.polyfit(INDEX, TREND_FOR,polynomial_degree)
     P = np.poly1d(cc)
     plt.subplot(211)
@@ -144,7 +147,8 @@ if __name__=='__main__':
     plt.title('R2=%.4f'%R2(TREND_BACK, P(INDEX_1)))
     plt.legend(loc='best')
     plt.show()
- ''''''
+
+ ''''GM alpha model''''
     def GM(alpha):
         alpha = alpha[0]
         X_0 = TREND_FOR
