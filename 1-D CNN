@@ -10,12 +10,16 @@ if __name__=='__main__':
     data=pd.read_csv(r'C:\Users\Administrator\Desktop\data\dis.csv',index_col="time0")
     level=data['water_level'].values.reshape(-1,1)
     precipitation=data['precipitation'].values.reshape(-1,1)
+    
+    #normalization 
     scaler_residual=MaxAbsScaler().fit(residual)
     scaler_level=MaxAbsScaler().fit(level)
     scaler_precipitation=MaxAbsScaler().fit(precipitation)
     residual=scaler_residual.transform(residual)
     level=scaler_level.transform(level)
     precipitation=scaler_precipitation.transform(precipitation)
+    
+    #Construct lagged variables
     residual_0=residual[4:].reshape(1,-1);residual_1=residual[3:-1];residual_2=residual[2:-2]
     level_0=level[4:];level_1=level[3:-1];level_2=level[2:-2];level_3=level[1:-3];level_4=level[:-4];level_change=np.diff(level[3:],axis=0);level_change_1=np.diff(level[2:-1],axis=0);level_change_2=np.diff(level[1:-2],axis=0)
     pre_0=precipitation[4:];pre_1=precipitation[3:-1];pre_2=precipitation[2:-2];pre_3=precipitation[1:-3];pre_sum=pre_0+pre_1
@@ -34,16 +38,13 @@ if __name__=='__main__':
         (residual_1, residual_2, level_2, level_3, level_change, level_change_1, pre_1, pre_2, pre_3))
 ''''''
     N_split=0.8
-    PREDICT_NUM = 12
+    PREDICT_NUM = 12 #one year prediction
     train_size=int((len(Label)-PREDICT_NUM)*N_split)
     valid_size=len(Label)-train_size-PREDICT_NUM
     text_size=len(Label)-train_size-valid_size
 
     from keras.models import Sequential
     from keras.layers import LSTM,Dense,Conv1D,BatchNormalization,MaxPool1D,Dropout,Flatten,AvgPool1D,Activation
-    from keras.layers import TimeDistributed
-    from keras.callbacks import ReduceLROnPlateau
-    from keras.callbacks import EarlyStopping
     from keras import regularizers,initializers,optimizers
 
     CE=[];LO=[]
